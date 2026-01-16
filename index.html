@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Debugger AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e27;
+            --bg-secondary: #141b3d;
+            --accent-primary: #00ff88;
+            --accent-secondary: #ff0080;
+            --accent-warning: #ffd700;
+            --text-primary: #e0e6ff;
+            --text-secondary: #8b93b8;
+            --border-color: #1e2852;
+            --glow-primary: rgba(0, 255, 136, 0.5);
+            --glow-secondary: rgba(255, 0, 128, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(0, 255, 136, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 0, 128, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .grid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(var(--border-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
+            background-size: 50px 50px;
+            opacity: 0.3;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: slideDown 0.8s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(2.5rem, 6vw, 5rem);
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: -0.02em;
+            text-shadow: 0 0 80px var(--glow-primary);
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                filter: brightness(1);
+            }
+            50% {
+                filter: brightness(1.2);
+            }
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+        }
+
+        .main-panel {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 
+                0 0 40px rgba(0, 255, 136, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            animation: fadeIn 1s ease-out 0.2s both;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .lang-selector {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .lang-btn {
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .lang-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.5s, height 0.5s;
+            z-index: 0;
+            opacity: 0.2;
+        }
+
+        .lang-btn:hover::before {
+            width: 200px;
+            height: 200px;
+        }
+
+        .lang-btn span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .lang-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            box-shadow: 0 0 20px var(--glow-primary);
+        }
+
+        .lang-btn.active {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-color: var(--accent-primary);
+            color: var(--bg-primary);
+            font-weight: 700;
+            box-shadow: 0 0 30px var(--glow-primary);
+        }
+
+        .lang-btn.active::before {
+            display: none;
+        }
+
+        label {
+            display: block;
+            color: var(--accent-primary);
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.1em;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 400px;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95rem;
+            padding: 1.5rem;
+            resize: vertical;
+            transition: all 0.3s ease;
+            line-height: 1.6;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 20px var(--glow-primary);
+        }
+
+        textarea::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.5;
+        }
+
+        .btn-container {
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .check-btn {
+            flex: 1;
+            padding: 1.25rem 2rem;
+            background: linear-gradient(135deg, var(--accent-primary), #00cc6a);
+            border: none;
+            color: var(--bg-primary);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 900;
+            cursor: pointer;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px var(--glow-primary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .check-btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .check-btn:hover::after {
+            width: 400px;
+            height: 400px;
+        }
+
+        .check-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px var(--glow-primary);
+        }
+
+        .check-btn:active {
+            transform: translateY(0);
+        }
+
+        .check-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #result {
+            margin-top: 2rem;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .result-card {
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .result-card.success {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 20px var(--glow-primary);
+        }
+
+        .result-card.error {
+            border-color: var(--accent-secondary);
+            box-shadow: 0 0 20px var(--glow-secondary);
+        }
+
+        .result-card.warning {
+            border-color: var(--accent-warning);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .status-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+        }
+
+        .status-icon.success {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        .status-icon.error {
+            background: var(--accent-secondary);
+            color: white;
+        }
+
+        .status-icon.warning {
+            background: var(--accent-warning);
+            color: var(--bg-primary);
+        }
+
+        .result-content {
+            color: var(--text-secondary);
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+
+        .fixed-code {
+            background: var(--bg-secondary);
+            border: 2px solid var(--accent-primary);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+            position: relative;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .code-label {
+            color: var(--accent-primary);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.1em;
+        }
+
+        .copy-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            box-shadow: 0 0 15px var(--glow-primary);
+        }
+
+        .code-content {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 2rem;
+            justify-content: center;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--accent-primary);
+            font-weight: 700;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: 3rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .lang-selector {
+                gap: 0.5rem;
+            }
+
+            .lang-btn {
+                padding: 0.6rem 1rem;
+                font-size: 0.8rem;
+            }
+
+            .btn-container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-bg"></div>
+    
+    <div class="container">
+        <header>
+            <h1>Code Debugger AI</h1>
+            <p class="subtitle">Neural Code Analysis</p>
+        </header>
+
+        <div class="main-panel">
+            <div class="lang-selector">
+                <button class="lang-btn active" data-lang="auto"><span>Auto Detect</span></button>
+                <button class="lang-btn" data-lang="lua"><span>Roblox Lua</span></button>
+                <button class="lang-btn" data-lang="javascript"><span>JavaScript</span></button>
+                <button class="lang-btn" data-lang="html"><span>HTML</span></button>
+                <button class="lang-btn" data-lang="css"><span>CSS</span></button>
+                <button class="lang-btn" data-lang="python"><span>Python</span></button>
+                <button class="lang-btn" data-lang="java"><span>Java</span></button>
+                <button class="lang-btn" data-lang="cpp"><span>C++</span></button>
+            </div>
+
+            <label for="codeInput">Paste Your Code</label>
+            <textarea 
+                id="codeInput" 
+                placeholder="-- Paste your code here
+-- The AI will analyze it for bugs and provide a fixed version
+-- Supports: Roblox Lua, JavaScript, HTML, CSS, Python, Java, C++, and more!"
+            ></textarea>
+
+            <div class="btn-container">
+                <button class="check-btn" id="checkBtn">
+                    <span>Analyze & Debug</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+   <footer>
+     powered by webcreatorluke
+    </footer>
+
+    <script>
+        let selectedLanguage = 'auto';
+
+        // Language selector
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedLanguage = btn.dataset.lang;
+            });
+        });
+
+        // Check code button
+        document.getElementById('checkBtn').addEventListener('click', async () => {
+            const code = document.getElementById('codeInput').value.trim();
+            const resultDiv = document.getElementById('result');
+            const checkBtn = document.getElementById('checkBtn');
+
+            if (!code) {
+                resultDiv.innerHTML = `
+                    <div class="result-card error">
+                        <div class="result-header">
+                            <div class="status-icon error">!</div>
+                            <span>No Code Provided</span>
+                        </div>
+                        <div class="result-content">Please paste some code to analyze.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Show loading
+            resultDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div class="loading-text">Analyzing code with AI...</div>
+                </div>
+            `;
+            checkBtn.disabled = true;
+
+            try {
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: `You are a code debugging expert. Analyze the following code${selectedLanguage !== 'auto' ? ` (language: ${selectedLanguage})` : ''} for bugs, errors, or issues.
+
+Instructions:
+1. First, determine if there are any bugs, errors, syntax issues, or logical problems
+2. If there are NO issues, respond with: "NO_BUGS: [brief explanation of why the code is correct]"
+3. If there ARE issues, respond with: "BUGS_FOUND: [description of issues]
+
+FIXED_CODE:
+[the corrected code that fixes all issues]"
+
+Code to analyze:
+\`\`\`
+${code}
+\`\`\`
+
+Remember: Be thorough but concise. Only provide fixed code if there are actual bugs or improvements to make.`
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                const aiResponse = data.content
+                    .filter(item => item.type === 'text')
+                    .map(item => item.text)
+                    .join('\n');
+
+                // Parse the response
+                if (aiResponse.startsWith('NO_BUGS:')) {
+                    const explanation = aiResponse.replace('NO_BUGS:', '').trim();
+                    resultDiv.innerHTML = `
+                        <div class="result-card success">
+                            <div class="result-header">
+                                <div class="status-icon success">✓</div>
+                                <span>No Bugs Found!</span>
+                            </div>
+                            <div class="result-content">${escapeHtml(explanation)}</div>
+                        </div>
+                    `;
+                } else if (aiResponse.includes('BUGS_FOUND:')) {
+                    const parts = aiResponse.split('FIXED_CODE:');
+                    const bugDescription = parts[0].replace('BUGS_FOUND:', '').trim();
+                    const fixedCode = parts[1] ? parts[1].trim() : '';
+
+                    resultDiv.innerHTML = `
+                        <div class="result-card warning">
+                            <div class="result-header">
+                                <div class="status-icon warning">!</div>
+                                <span>Issues Detected</span>
+                            </div>
+                            <div class="result-content">${escapeHtml(bugDescription)}</div>
+                        </div>
+                        ${fixedCode ? `
+                        <div class="fixed-code">
+                            <div class="code-header">
+                                <span class="code-label">Fixed Code</span>
+                                <button class="copy-btn" onclick="copyCode(this)">Copy Code</button>
+                            </div>
+                            <div class="code-content"><code>${escapeHtml(fixedCode)}</code></div>
+                        </div>
+                        ` : ''}
+                    `;
+                } else {
+                    // Fallback parsing
+                    resultDiv.innerHTML = `
+                        <div class="result-card warning">
+                            <div class="result-header">
+                                <div class="status-icon warning">i</div>
+                                <span>Analysis Result</span>
+                            </div>
+                            <div class="result-content">${escapeHtml(aiResponse)}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result-card error">
+                        <div class="result-header">
+                            <div class="status-icon error">✗</div>
+                            <span>Analysis Failed</span>
+                        </div>
+                        <div class="result-content">Error: ${escapeHtml(error.message)}
+                        
+Please try again or check your internet connection.</div>
+                    </div>
+                `;
+            } finally {
+                checkBtn.disabled = false;
+            }
+        });
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function copyCode(btn) {
+            const codeContent = btn.closest('.fixed-code').querySelector('code').textContent;
+            navigator.clipboard.writeText(codeContent).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.style.background = 'var(--accent-primary)';
+                btn.style.color = 'var(--bg-primary)';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '';
+                    btn.style.color = '';
+                }, 2000);
+            });
+        }
+
+        // Allow Enter key to submit (Ctrl+Enter for new line)
+        document.getElementById('codeInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                document.getElementById('checkBtn').click();
+            }
+        });
+    </script>
+</body>
+</html>
